@@ -50,7 +50,7 @@ public class Services {
     
     private OpenAMClient client;
     
-    public Services() {
+    public Services () {
         client = new OpenAMClient();
     }
     
@@ -76,7 +76,9 @@ public class Services {
         return forwardAndFilter("POST", endpoint, vitalToken, body);
     }
     
-    private Response forwardAndFilter(String method, String endpoint, String vitalToken, String body) {
+   
+   
+     private Response forwardAndFilter(String method, String endpoint, String vitalToken, String body) {
         Cookie ck;
         String internalToken;
         CloseableHttpClient httpclient;
@@ -184,6 +186,9 @@ public class Services {
             }
         }
         
+        
+        if(endpoint.endsWith("sensor/metadata"))
+        {
         // Convert string to object and filter by specific fields values (you may get an array or not)
         if (respString.charAt(0) == '[') {
             respString = "{ \"documents\": " + respString + " }";
@@ -200,7 +205,13 @@ public class Services {
                         JsonLdOptions options = new JsonLdOptions();
                         Object jsonObject = JsonUtils.fromString(utils.JsonUtils.serializeJson(array.getDocuments().get(ai)));
                         Object result = JsonLdProcessor.expand(jsonObject, options);
-                        docsExpanded.add((PPIResponse) utils.JsonUtils.deserializeJson(JsonUtils.toPrettyString(result), PPIResponse.class));
+                                        //        System.out.println("*expandedResult "+ JsonUtils.toPrettyString(result));
+
+                            String   toParse = JsonUtils.toPrettyString(result);
+                            if  (toParse.charAt(0) == '[')
+                                toParse = toParse.substring(1, toParse.length()-1);
+                            docsExpanded.add((PPIResponse) utils.JsonUtils.deserializeJson(toParse, PPIResponse.class));                          
+                       // docsExpanded.add((PPIResponse) utils.JsonUtils.deserializeJson(JsonUtils.toPrettyString(result), PPIResponse.class));
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -210,24 +221,136 @@ public class Services {
                 Iterator<Map.Entry<String, RegexStringList>> it = perm.getRetrieve().getDenied().entrySet().iterator();
                 while (it.hasNext()) {
                     Map.Entry<String, RegexStringList> pair = it.next();
-                    docsExpanded.removeIf(p -> 
-                        !getSubObject(p, pair.getKey()).isEmpty() && ((RegexStringList) pair.getValue()).contains(getSubObject(p, pair.getKey())));
+                     docsExpanded.removeIf(p ->    !getSubObject(p, pair.getKey()).isEmpty() && ((RegexStringList) pair.getValue()).contains(getSubObject(p, pair.getKey())));
                 }
-                it = perm.getRetrieve().getAllowed().entrySet().iterator();
+                  float minLat = 0;
+                   float maxLat = 91;
+                   float minLong= 0;
+                     float maxLong = 1000;
+                
+               it = perm.getRetrieve().getAllowed().entrySet().iterator();
                 while (it.hasNext()) {
                     Map.Entry<String, RegexStringList> pair = it.next();
-                    docsExpanded.removeIf(p -> 
-                        !getSubObject(p, pair.getKey()).isEmpty() && !((RegexStringList) pair.getValue()).contains(getSubObject(p, pair.getKey())));
+                    
+                    System.out.println("permissionAllowed check - key "+ pair.getKey() + " value " + pair.getValue()  );
+                        
+                                if ( pair.getKey().equals("{\""))  //permissions in -and- area boundaries governance
+                                {
+                                    String permissionvalue = pair.getValue().toString();
+                                    if ( permissionvalue.contains("http://vital-iot.eu/ontology/ns/hasLastKnownLocation" ) ) //area boundaries governance
+                                    {
+
+    //TODO: generalize this with general parser for different applications-- here for governance only wiht policies with pre-defioned syntax
+
+                                      
+
+                                        String[] resourcesInAnd = permissionvalue.split("},");
+                                        String latRange = resourcesInAnd[0].substring(resourcesInAnd[0].lastIndexOf("{")) ;
+                                        System.out.println("lat condition: " + latRange);
+
+
+                                        String[] latBoundaries = latRange.split(",");
+                                        String gt = latBoundaries[0].substring(latBoundaries[0].lastIndexOf(":")+1) ;
+                                        String lt = latBoundaries[1].substring(latBoundaries[1].lastIndexOf(":")+1, latBoundaries[1].indexOf("}")) ;
+
+
+                                        minLat =  Float.valueOf( gt);
+                                        maxLat = Float.valueOf(lt);
+                                        System.out.println("Lat boundaries  " + minLat + " - " + maxLat);
+
+
+                                        String lonRange =  resourcesInAnd[1].substring(resourcesInAnd[1].lastIndexOf("{") );
+                                        lonRange = lonRange.substring(0,lonRange.lastIndexOf("}}")+1);
+                                        System.out.println("lon condition: " + lonRange);
+
+
+                                        String[] lonBoundaries = lonRange.split(",");
+                                        gt = lonBoundaries[0].substring(lonBoundaries[0].lastIndexOf(":")+1) ;
+                                        lt = lonBoundaries[1].substring(lonBoundaries[1].lastIndexOf(":")+1, lonBoundaries[1].indexOf("}")) ;
+
+
+                                        minLong =  Float.valueOf( gt);
+                                        maxLong = Float.valueOf(lt);
+                                        System.out.println("Long boundaries  " + minLong + " - " + maxLong);
+
+
+                                    //    List<PPIResponse> tmpDocs = new ArrayList<PPIResponse>();
+                                     //   tmpDocs.addAll(array.getDocuments());
+
+
+                                        System.out.println("ai  size " + array.getDocuments().size() + "  " + docsExpanded.size() );
+                                      
+                                        
+                                        for (int ai = array.getDocuments().size() -1; ai>=0; ai--) {
+                                            Object o = array.getDocuments().get(ai);
+                                        
+                                   //            tmpDocs.remove(ai);
+                                   
+                                 
+                                         if (array.getDocuments().get(ai).toString().contains("hasLastKnownLocation") )
+                                              {
+                                                // System.out.println("checking location  / ai  " + array.getDocuments().get(ai).toString());
+                                              
+                                                   String t = o.toString();
+                                                   //System.out.println("t " + t);
+                                                    t= t.substring(t.lastIndexOf("hasLastKnownLocation" ));
+                                                     t= t.substring(0,t.indexOf("}" ));
+                                                   String s = "";
+                                                   boolean latOk = false;
+                                                  boolean longOk = false;
+//hasLastKnownLocation={type=geo:Point, geo:lat=45.072338630573036, geo:long=7.561769485473633}, 
+                                                  String[] checkBoundaries = t.split(",");
+     for (int i = 0; i < checkBoundaries.length; i++) {
+            if (checkBoundaries[i].contains("lat" )) {
+                 s = checkBoundaries[i].substring(checkBoundaries[i].indexOf("=" )+1);
+                float latValue =  Float.valueOf(s);
+                  if ( latValue > minLat && latValue < maxLat )
+                           latOk= true;
+        
+            } else 
+              if (checkBoundaries[i].contains("long" )) {
+                 s = checkBoundaries[i].substring(checkBoundaries[i].indexOf("=" )+1);
+                float longValue =  Float.valueOf(s);
+                
+                System.out.println("long check" + longValue + "[" + minLong + "," + maxLong + "]" );
+      
+                  if ( longValue > minLong && longValue < maxLong )
+                           longOk= true;
+          
+            }    
+	}   
+                                                      if (!( longOk  && latOk))
+                                                    array.getDocuments().remove((PPIResponse)o);
+                                                      System.out.println("remove - arrarySize" +   array.getDocuments().size() );
+                                                      }
+                                                     }   //loop for
+
+                                   
+                                   
+                                   
+                                   
+                                   
+                                        } //permission
+                                        
+                                        
+                                    }//area 
+                              
+
+                    //docsExpanded.removeIf(p ->  !getSubObject(p, pair.getKey()).isEmpty() && !((RegexStringList) pair.getValue()).contains(getSubObject(p, pair.getKey())));
                 }
                 try {
                     List<PPIResponse> tmpDocs = new ArrayList<PPIResponse>();
                     tmpDocs.addAll(array.getDocuments());
-                    for (int ai = 0; ai < array.getDocuments().size(); ai++) {
-                        for (int aj = 0; aj < docsExpanded.size(); aj++) {
+             	
+                    
+             /*         for (int ai = array.getDocuments().size() -1; ai>=0; ai--) {
+                                    for (int aj = docsExpanded.size() -1 ;aj>=0; aj--) {                               
+             //       for (int ai = 0; ai < array.getDocuments().size(); ai++) {  Necessario togliere elementi dall-ultimo
+                     //   for (int aj = 0; aj < docsExpanded.size(); aj++) {
                             if (array.getDocuments().get(ai).getProperties().get("id").equals(docsExpanded.get(aj).getProperties().get("@id")))
                                 tmpDocs.remove(ai);
                         }
-                    }
+                    }*/
                     array.setDocuments(tmpDocs);
                     if (!wasEmpty && array.getDocuments().isEmpty()) {
                         return Response.status(Status.FORBIDDEN)
@@ -294,11 +417,12 @@ public class Services {
                 }
             }
         }
-
+}
         return Response.ok()
             .entity(respString)
             .build();
     }
+   
 
     private List<Object> getSubObject(PPIResponse resp, String key) {
         PPIResponse inner = new PPIResponse(resp);
