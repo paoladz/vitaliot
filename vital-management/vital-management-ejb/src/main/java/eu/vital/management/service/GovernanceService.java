@@ -106,8 +106,8 @@ private Cookie readAuthCookie(@Context HttpHeaders hh) {
 		String new_bound="{\"name\":\"http://purl.oclc.org:80/NET/ssnx/ssn#observationProperty|@type$",ii="",groupName="location";
 		String bound_ob="";
 		String policyNameArea="GlobalAreaBoundaryPolicy",policyNameObservation="GlobalObservationsBoundaryPolicy",mapLimit="";
-		String pre_ang_lat="{http://vital-iot.eu/ontology/ns/hasLastKnownLocation|http://www.w3.org/2003/01/geo/wgs84_pos#lat|@value${\"$gt\" : ";
-		String pre_ang_long="{http://vital-iot.eu/ontology/ns/hasLastKnownLocation|http://www.w3.org/2003/01/geo/wgs84_pos#long|@value${\"$gt\" : ";
+		String pre_ang_lat="{http://vital-iot.eu/ontology/ns/hasLastKnownLocation|http://www.w3.org/2003/01/geo/wgs84_pos#lat|@value${\"$gt\":";
+		String pre_ang_long="{http://vital-iot.eu/ontology/ns/hasLastKnownLocation|http://www.w3.org/2003/01/geo/wgs84_pos#long|@value${\"$gt\":";
 
 		ObjectMapper mapper = new ObjectMapper();
 		Map<String, Object> result = mapper.convertValue(boundaries, Map.class);
